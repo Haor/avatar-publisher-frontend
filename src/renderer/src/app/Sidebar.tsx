@@ -1,6 +1,6 @@
 import { motion } from "motion/react";
 import { Home, Layers, Send, History, Users, Settings, Plus } from "lucide-react";
-import brandIconUrl from "../../../../resources/icon1.svg";
+import brandIconUrl from "../../../../resources/icon1.png";
 import { spring } from "../shared/springs";
 import { StatusDot } from "../shared/components/StatusDot";
 import { ConnectionStatus } from "../shared/components/ConnectionStatus";
