@@ -90,6 +90,23 @@ html {
   overflow-y: scroll;
 }
 
+/* — 应用级交互保护 — */
+body { user-select: none; -webkit-user-select: none; }
+img, svg { -webkit-user-drag: none; }
+
+/* — 用户可能需要复制的内容区域 — */
+.detail-meta-value,
+.detail-mono,
+.error-banner-text,
+.execution-card-error,
+.run-detail-account-error,
+.account-display-name,
+.account-login-name,
+.about-value--mono,
+.storage-path-input,
+input,
+textarea { user-select: text; -webkit-user-select: text; }
+
 body {
   min-height: 100vh;
   background: var(--bg);
@@ -349,11 +366,11 @@ h1 {
   display: none !important;
 }
 .page--entering {
-  animation: pageIn 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: pageIn 440ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes pageIn {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 .page-placeholder {
@@ -1917,7 +1934,7 @@ h1 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 .step-indicator-circle {
   width: 28px;
@@ -1945,7 +1962,7 @@ h1 {
   border-color: var(--brand);
 }
 .step-indicator-label {
-  font: 400 11px var(--font);
+  font: 400 11px/16px var(--font);
   color: var(--fg-faint);
   white-space: nowrap;
   transition: color 200ms;

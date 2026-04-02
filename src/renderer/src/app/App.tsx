@@ -33,20 +33,17 @@ const pageEntries: { key: PageKey; component: React.ComponentType }[] = [
 ];
 
 /**
- * 页面容器 — 首次进入播放 CSS 动画，后续切换即时显示
+ * 页面容器 — 每次切入时播放 CSS 进场动画
  * Page 组件始终保持同一实例 (KeepAlive)
  */
 function PageSlot({ pageKey, active, children }: { pageKey: string; active: boolean; children: React.ReactNode }) {
-  const hasAnimatedRef = useRef(false);
   const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
-    if (active && !hasAnimatedRef.current) {
-      hasAnimatedRef.current = true;
-      setAnimating(true);
-      const timer = setTimeout(() => setAnimating(false), 420);
-      return () => clearTimeout(timer);
-    }
+    if (!active) return;
+    setAnimating(true);
+    const timer = setTimeout(() => setAnimating(false), 420);
+    return () => clearTimeout(timer);
   }, [active]);
 
   return (
