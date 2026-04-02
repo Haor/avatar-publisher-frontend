@@ -16,19 +16,13 @@ import { ImportDropZone } from "./ImportDropZone";
 import { DetailPanel } from "./DetailPanel";
 import type { ArtifactSummary } from "../../contracts/artifacts";
 import type { MyAvatarSummary } from "../../contracts/my-avatars";
-import type { PagedCollectionResponse } from "../../contracts/shared";
 
 type Tab = "all" | "local" | "cloud";
 type SelectedItem = { type: "local" | "cloud"; id: string; accountId?: string; imageUrl?: string | null } | null;
 
-const ALL_TAB_BATCH_SIZE = 50;
+const CLOUD_BATCH_SIZE = 50;
 const CLOUD_PAGE_SIZE = 20;
-const PAGE_CACHE_LIMIT = 20;
 const listStagger = makeStagger();
-
-function pageCacheKey(accountId: string, offset: number, search: string | undefined): string {
-  return `${accountId}:${offset}:${search ?? ""}`;
-}
 
 const TAB_KEYS: Tab[] = ["all", "local", "cloud"];
 
@@ -199,15 +193,10 @@ export function LibraryPage() {
   const [cloudOffset, setCloudOffset] = useState(0);
   const [selected, setSelected] = useState<SelectedItem>(null);
 
-  const [allCloudItems, setAllCloudItems] = useState<MyAvatarSummary[]>([]);
-  const [allHasMore, setAllHasMore] = useState(true);
-  const [allLoading, setAllLoading] = useState(false);
-  const allOffsetRef = useRef(0);
-  const allGenRef = useRef(0);
-  const allLoadingRef = useRef(false);
-  const allHasMoreRef = useRef(true);
-  const [sentinelNode, setSentinelNode] = useState<HTMLDivElement | null>(null);
-  const sentinelCallbackRef = useCallback((node: HTMLDivElement | null) => { setSentinelNode(node); }, []);
+  // --- 云端全量缓存 (替代旧的 allCloudItems + 服务端分页) ---
+  const [cloudCache, setCloudCache] = useState<MyAvatarSummary[]>([]);
+  const [cloudCacheLoading, setCloudCacheLoading] = useState(false);
+  const cloudGenRef = useRef(0);
 
   // Sidebar 账号点击: 切换到云端 tab + 指定账号
   // navigationTick 确保同页面内重复导航也能触发
@@ -235,122 +224,86 @@ export function LibraryPage() {
   );
   const artifacts = artifactsData?.items ?? [];
 
-  const effectiveOffset = activeTab === "cloud" ? cloudOffset : 0;
+  // --- 后台全量加载云端头像 (不传 search，与 VRCX 策略一致) ---
+  const loadAllCloud = useCallback(async (accountId: string) => {
+    cloudGenRef.current += 1;
+    const gen = cloudGenRef.current;
+    setCloudCache([]);
+    setCloudCacheLoading(true);
 
-  const avatarPageCache = useRef(new Map<string, PagedCollectionResponse<MyAvatarSummary>>());
-
-  const resetAllCloudFeed = useCallback(() => {
-    allGenRef.current += 1;
-    allOffsetRef.current = 0;
-    allLoadingRef.current = false;
-    allHasMoreRef.current = true;
-    setAllCloudItems([]);
-    setAllHasMore(true);
-    setAllLoading(false);
-  }, []);
-
-  const { data: avatarsData, loading: avatarsLoading, refetch: refetchAvatarsRaw } = useQuery(
-    (signal) => {
-      if (activeTab !== "cloud" || !effectiveCloudAccountId) return Promise.resolve({ items: [] as MyAvatarSummary[], pagination: { limit: CLOUD_PAGE_SIZE, offset: 0, returnedCount: 0, hasMore: false, nextOffset: null } });
-      const key = pageCacheKey(effectiveCloudAccountId, effectiveOffset, debouncedSearch || undefined);
-      const cached = avatarPageCache.current.get(key);
-
-      const fetchFromServer = () =>
-        api.myAvatars.list(
-          { accountId: effectiveCloudAccountId, limit: CLOUD_PAGE_SIZE, offset: effectiveOffset, search: debouncedSearch || undefined },
-          signal,
-        ).then((result) => {
-          if (avatarPageCache.current.size >= PAGE_CACHE_LIMIT) {
-            const oldest = avatarPageCache.current.keys().next().value;
-            if (oldest) avatarPageCache.current.delete(oldest);
-          }
-          avatarPageCache.current.set(key, result);
-          return result;
-        });
-
-      if (cached) {
-        fetchFromServer().catch(() => {});
-        return Promise.resolve(cached);
-      }
-      return fetchFromServer();
-    },
-    [effectiveCloudAccountId, effectiveOffset, debouncedSearch, activeTab],
-  );
-
-  const avatars = avatarsData?.items ?? [];
-  const cloudPagination = avatarsData?.pagination ?? null;
-  const cloudPage = cloudPagination ? Math.floor(cloudPagination.offset / cloudPagination.limit) + 1 : 1;
-  const showPagination = activeTab === "cloud" && cloudPagination && (cloudPagination.hasMore || cloudPagination.offset > 0);
-
-  useEffect(() => {
-    setCloudOffset(0);
-    avatarPageCache.current.clear();
-  }, [effectiveCloudAccountId, debouncedSearch]);
-
-  useEffect(() => {
-    resetAllCloudFeed();
-  }, [debouncedSearch, effectiveCloudAccountId, resetAllCloudFeed]);
-
-  const loadMoreAllCloud = useCallback(async () => {
-    if (!effectiveCloudAccountId || allLoadingRef.current || !allHasMoreRef.current) return;
-    allLoadingRef.current = true;
-    setAllLoading(true);
-    const gen = allGenRef.current;
+    let offset = 0;
+    const accumulated: MyAvatarSummary[] = [];
     try {
-      const result = await api.myAvatars.list({
-        accountId: effectiveCloudAccountId,
-        limit: ALL_TAB_BATCH_SIZE,
-        offset: allOffsetRef.current,
-        search: debouncedSearch || undefined,
-      });
-      if (gen !== allGenRef.current) return;
-      setAllCloudItems(prev => [...prev, ...result.items]);
-      allHasMoreRef.current = result.pagination.hasMore;
-      setAllHasMore(result.pagination.hasMore);
-      allOffsetRef.current = result.pagination.nextOffset ?? allOffsetRef.current + ALL_TAB_BATCH_SIZE;
-    } catch { /* stale generation or network error */ } finally {
-      if (gen === allGenRef.current) {
-        allLoadingRef.current = false;
-        setAllLoading(false);
+      while (true) {
+        const result = await api.myAvatars.list({
+          accountId,
+          limit: CLOUD_BATCH_SIZE,
+          offset,
+        });
+        if (gen !== cloudGenRef.current) return; // 账号已切换，丢弃
+        accumulated.push(...result.items);
+        setCloudCache([...accumulated]);
+        if (!result.pagination.hasMore || result.items.length === 0) break;
+        offset = result.pagination.nextOffset ?? offset + CLOUD_BATCH_SIZE;
+      }
+    } catch {
+      // 网络错误 — 保留已加载的部分数据
+    } finally {
+      if (gen === cloudGenRef.current) {
+        setCloudCacheLoading(false);
       }
     }
-  }, [effectiveCloudAccountId, debouncedSearch, api]);
+  }, [api]);
+
+  // 账号变化时重新全量加载
+  useEffect(() => {
+    if (effectiveCloudAccountId) {
+      loadAllCloud(effectiveCloudAccountId);
+    } else {
+      setCloudCache([]);
+      setCloudCacheLoading(false);
+    }
+  }, [effectiveCloudAccountId, loadAllCloud]);
 
   const refetchAvatars = useCallback(() => {
-    avatarPageCache.current.clear();
-    resetAllCloudFeed();
-
-    if (activeTab === "cloud") {
-      refetchAvatarsRaw();
-      return;
+    if (effectiveCloudAccountId) {
+      loadAllCloud(effectiveCloudAccountId);
     }
+  }, [effectiveCloudAccountId, loadAllCloud]);
 
-    if (activeTab === "all" && effectiveCloudAccountId) {
-      void loadMoreAllCloud();
-    }
-  }, [activeTab, effectiveCloudAccountId, loadMoreAllCloud, refetchAvatarsRaw, resetAllCloudFeed]);
-
+  // 搜索词变化时重置云端分页 offset
   useEffect(() => {
-    if (activeTab === "all" && effectiveCloudAccountId && allOffsetRef.current === 0 && !allLoadingRef.current) {
-      loadMoreAllCloud();
-    }
-  }, [activeTab, effectiveCloudAccountId, loadMoreAllCloud]);
+    setCloudOffset(0);
+  }, [debouncedSearch]);
 
-  useEffect(() => {
-    if (activeTab !== "all" || !sentinelNode) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) loadMoreAllCloud(); },
-      { rootMargin: "200px" },
-    );
-    observer.observe(sentinelNode);
-    return () => observer.disconnect();
-  }, [activeTab, loadMoreAllCloud, sentinelNode]);
-
+  // --- 前端过滤 (本地 + 云端统一) ---
   const filteredArtifacts = useMemo(() => {
     if (!debouncedSearch) return artifacts;
     const q = debouncedSearch.toLowerCase();
     return artifacts.filter((a) => a.name.toLowerCase().includes(q));
   }, [artifacts, debouncedSearch]);
+
+  const filteredCloudCache = useMemo(() => {
+    if (!debouncedSearch) return cloudCache;
+    const q = debouncedSearch.toLowerCase();
+    return cloudCache.filter((a) => a.name.toLowerCase().includes(q));
+  }, [cloudCache, debouncedSearch]);
+
+  // --- 云端 Tab 前端分页 ---
+  const cloudPagination = useMemo(() => {
+    const total = filteredCloudCache.length;
+    const hasMore = cloudOffset + CLOUD_PAGE_SIZE < total;
+    return {
+      limit: CLOUD_PAGE_SIZE,
+      offset: cloudOffset,
+      returnedCount: Math.min(CLOUD_PAGE_SIZE, Math.max(0, total - cloudOffset)),
+      hasMore,
+      nextOffset: hasMore ? cloudOffset + CLOUD_PAGE_SIZE : null,
+    };
+  }, [filteredCloudCache.length, cloudOffset]);
+
+  const cloudPage = Math.floor(cloudOffset / CLOUD_PAGE_SIZE) + 1;
+  const showPagination = activeTab === "cloud" && (cloudPagination.hasMore || cloudPagination.offset > 0);
 
   const accountNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -372,7 +325,18 @@ export function LibraryPage() {
         sourceIcon: "local" as const,
       }),
     );
-    const cloudSource = activeTab === "all" ? allCloudItems : (activeTab === "cloud" ? avatars : []);
+
+    let cloudSource: MyAvatarSummary[];
+    if (activeTab === "all") {
+      cloudSource = filteredCloudCache;
+    } else if (activeTab === "cloud") {
+      const start = cloudOffset;
+      const end = start + CLOUD_PAGE_SIZE;
+      cloudSource = filteredCloudCache.slice(start, end);
+    } else {
+      cloudSource = [];
+    }
+
     const cloudCards = cloudSource.map(
       (a: MyAvatarSummary) => ({
         key: `cloud-${a.avatarId}`,
@@ -386,7 +350,7 @@ export function LibraryPage() {
       }),
     );
     return [...localCards, ...cloudCards];
-  }, [activeTab, filteredArtifacts, avatars, allCloudItems, accountNameMap]);
+  }, [activeTab, filteredArtifacts, filteredCloudCache, cloudOffset, accountNameMap, t]);
 
   const modelsRef = useRef(displayModels);
   modelsRef.current = displayModels;
@@ -419,7 +383,7 @@ export function LibraryPage() {
     setSelected(null);
   }, []);
 
-  const isPageLoading = activeTab === "cloud" ? avatarsLoading : activeTab === "all" ? allLoading : false;
+  const isPageLoading = cloudCacheLoading && cloudCache.length === 0;
 
   return (
     <div className="library">
@@ -446,10 +410,11 @@ export function LibraryPage() {
             className="btn btn-ghost btn-icon"
             title={t("library:refreshTitle")}
             onClick={() => { refetchArtifacts(); refetchAvatars(); }}
+            disabled={cloudCacheLoading}
             whileTap={{ scale: 0.97 }}
             transition={spring.snappy}
           >
-            <RefreshCw size={14} strokeWidth={1.75} />
+            <RefreshCw size={14} strokeWidth={1.75} className={cloudCacheLoading ? "animate-spin" : ""} />
           </motion.button>
         </div>
       </div>
@@ -494,15 +459,10 @@ export function LibraryPage() {
               <ImportDropZone onImported={refetchArtifacts} />
             )}
 
-            {activeTab === "all" && (
-              <>
-                {allHasMore && <div ref={sentinelCallbackRef} style={{ gridColumn: "1 / -1", height: 1 }} />}
-                {allLoading && (
-                  <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "center", padding: 24 }}>
-                    <Spinner />
-                  </div>
-                )}
-              </>
+            {cloudCacheLoading && cloudCache.length > 0 && activeTab !== "local" && (
+              <div style={{ gridColumn: "1 / -1", display: "flex", justifyContent: "center", padding: 24 }}>
+                <Spinner />
+              </div>
             )}
           </motion.div>
         )}
