@@ -12,8 +12,10 @@ export const accountSessionResources = {
         noRepairNeeded: "账号会话仍然有效，无需修复。",
         missingSessionMaterial: "本地没有可复用的会话材料，需要重新登录。",
         recovered: "已重新验证账号会话。",
+        recoveredFromSnapshot: "已通过历史快照恢复账号会话。",
         reloginRequired: "自动修复未恢复会话，需要重新登录。",
         notRecovered: "自动修复已完成，但会话仍不可用。",
+        exhausted: "所有自动恢复手段已用尽，需要重新登录。",
         toastTitle: "账号修复结果",
       },
       sessionIssue: {
@@ -36,8 +38,10 @@ export const accountSessionResources = {
         noRepairNeeded: "帳號會話仍然有效，無需修復。",
         missingSessionMaterial: "本機沒有可重用的會話資料，需要重新登入。",
         recovered: "已重新驗證帳號會話。",
+        recoveredFromSnapshot: "已透過歷史快照恢復帳號會話。",
         reloginRequired: "自動修復未恢復會話，需要重新登入。",
         notRecovered: "自動修復已完成，但會話仍不可用。",
+        exhausted: "所有自動恢復手段已用盡，需要重新登入。",
         toastTitle: "帳號修復結果",
       },
       sessionIssue: {
@@ -60,8 +64,10 @@ export const accountSessionResources = {
         noRepairNeeded: "アカウントのセッションはまだ有効です。修復は不要です。",
         missingSessionMaterial: "再利用できるローカルセッション情報がありません。再ログインしてください。",
         recovered: "アカウントのセッションを再検証しました。",
+        recoveredFromSnapshot: "過去のスナップショットからアカウントのセッションを復元しました。",
         reloginRequired: "自動修復ではセッションを回復できませんでした。再ログインしてください。",
         notRecovered: "自動修復は完了しましたが、セッションはまだ利用できません。",
+        exhausted: "すべての自動回復手段を使い果たしました。再ログインしてください。",
         toastTitle: "アカウント修復結果",
       },
       sessionIssue: {
@@ -84,8 +90,10 @@ export const accountSessionResources = {
         noRepairNeeded: "The account session is still valid. No repair is needed.",
         missingSessionMaterial: "No reusable local session data was found. Sign in again.",
         recovered: "The account session has been validated again.",
+        recoveredFromSnapshot: "The account session was restored from a previous snapshot.",
         reloginRequired: "Automatic repair did not recover the session. Sign in again.",
         notRecovered: "Automatic repair finished, but the session is still unavailable.",
+        exhausted: "All automatic recovery methods have been exhausted. Sign in again.",
         toastTitle: "Account repair result",
       },
       sessionIssue: {

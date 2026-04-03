@@ -128,6 +128,19 @@ export function AccountListItem({
             {loading === "refresh" ? <Spinner size={14} /> : <RefreshCw size={14} strokeWidth={1.75} />}
           </motion.button>
 
+          {account.supportsAutoRepair && !account.sessionValid && (
+            <motion.button
+              className="btn btn-ghost btn-icon"
+              title={t("accounts:actions.repair")}
+              disabled={loading !== null}
+              onClick={() => handleAction("repair", () => onRepair(account.accountId))}
+              whileTap={{ scale: 0.97 }}
+              transition={spring.snappy}
+            >
+              {loading === "repair" ? <Spinner size={14} /> : <Wrench size={14} strokeWidth={1.75} />}
+            </motion.button>
+          )}
+
           <motion.button
             ref={triggerRef}
             className="btn btn-ghost btn-icon"

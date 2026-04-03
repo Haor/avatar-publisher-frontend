@@ -22,6 +22,7 @@ export function AccountsPage() {
   const { accounts, loading, error, refetch } = useAccounts();
   const { toast } = useToast();
   const [modal, setModal] = useState<"login" | "import" | null>(null);
+  const [reloginUsername, setReloginUsername] = useState<string | undefined>(undefined);
 
   async function handleRefresh(id: string) {
     try {
@@ -118,7 +119,11 @@ export function AccountsPage() {
                 onRepair={handleRepair}
                 onLogout={handleLogout}
                 onRemove={handleRemove}
-                onRelogin={() => setModal("login")}
+                onRelogin={(id) => {
+                  const account = accounts.find((a) => a.accountId === id);
+                  setReloginUsername(account?.loginName);
+                  setModal("login");
+                }}
               />
             </motion.div>
           ))}
@@ -127,7 +132,8 @@ export function AccountsPage() {
 
       <LoginModal
         open={modal === "login"}
-        onClose={() => setModal(null)}
+        prefillUsername={reloginUsername}
+        onClose={() => { setModal(null); setReloginUsername(undefined); }}
         onSuccess={refetch}
       />
       <ImportModal

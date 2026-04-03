@@ -12,11 +12,12 @@ import { resolveLocalizedText } from "../../i18n/localized-text";
 
 interface LoginModalProps {
   open: boolean;
+  prefillUsername?: string;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
+export function LoginModal({ open, prefillUsername, onClose, onSuccess }: LoginModalProps) {
   const { t } = useTranslation(["accounts", "common"]);
   const api = useApi();
   const [step, setStep] = useState<"credentials" | "twoFactor">("credentials");
@@ -52,6 +53,8 @@ export function LoginModal({ open, onClose, onSuccess }: LoginModalProps) {
       setServerPrompt(null);
       login.reset();
       verify.reset();
+    } else if (prefillUsername) {
+      setUsername(prefillUsername);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 

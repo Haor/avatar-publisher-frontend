@@ -716,7 +716,7 @@ h1 {
 .timeline { display: flex; flex-direction: column; }
 .timeline-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   padding: 11px 8px;
   border-radius: var(--radius-xs);
@@ -727,7 +727,6 @@ h1 {
 .timeline-item:last-child { border-bottom: none; }
 .timeline-item:hover { background: var(--bg-inset); }
 .timeline-dot-wrap {
-  padding-top: 5px;
   flex-shrink: 0;
   width: 10px;
   display: flex;
@@ -1211,6 +1210,7 @@ h1 {
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+  translate: 0 1px;
 }
 .status-dot--ok  { background: var(--ok); box-shadow: 0 0 6px var(--ok-glow); }
 .status-dot--warn { background: var(--warn); box-shadow: 0 0 6px var(--warn-glow); }
@@ -1255,10 +1255,9 @@ h1 {
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 1px 8px;
   border-radius: 100px;
-  font: 500 11px var(--font);
-  line-height: 1;
+  font: 500 11px/normal var(--font);
   white-space: nowrap;
 }
 .badge--neutral { background: var(--bg-inset); color: var(--fg-muted); }
